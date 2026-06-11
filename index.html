@@ -37,8 +37,38 @@
     h1 {
       font-size: 2rem;
       letter-spacing: 0.1em;
-      margin-bottom: 20px;
       color: #a8d5a2;
+    }
+
+    .title-bar {
+      display: flex;
+      align-items: center;
+      width: var(--board-size, 480px);
+      margin-bottom: 20px;
+    }
+
+    .title-bar h1 { flex: 1; }
+
+    #lang-select {
+      background: #243447;
+      color: #8899aa;
+      border: 1px solid #37474f;
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      padding-right: 22px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238899aa'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 7px center;
+    }
+
+    #lang-select:hover, #lang-select:focus {
+      border-color: #558b6e;
+      color: #e8eaf0;
     }
 
     .game-container {
@@ -285,6 +315,28 @@
 
     .result-play-again:hover { background: #c8e6c9; }
 
+    #diff-select {
+      background: #243447;
+      color: #8899aa;
+      border: 1px solid #37474f;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      padding-right: 22px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238899aa'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 7px center;
+    }
+
+    #diff-select:hover, #diff-select:focus {
+      border-color: #558b6e;
+      color: #e8eaf0;
+    }
+
     @media (max-width: 520px) {
       h1 { font-size: 1.5rem; }
     }
@@ -292,21 +344,27 @@
 </head>
 <body>
 
-<h1>リバーシ</h1>
+<div class="title-bar">
+  <h1 id="game-title">リバーシ</h1>
+  <select id="lang-select" onchange="changeLang(this.value)">
+    <option value="ja">日本語</option>
+    <option value="zh">中文</option>
+  </select>
+</div>
 
 <div class="game-container">
   <div class="scoreboard">
     <div class="score-item" id="black-score-item">
       <div class="score-stone black"></div>
       <div>
-        <div class="score-label">黒</div>
+        <div class="score-label" id="black-label">黒</div>
         <div class="score-value" id="black-count">2</div>
       </div>
     </div>
     <div class="turn-indicator" id="turn-indicator">黒のターン</div>
     <div class="score-item" id="white-score-item">
       <div>
-        <div class="score-label" style="text-align:right">白</div>
+        <div class="score-label" id="white-label" style="text-align:right">白</div>
         <div class="score-value" id="white-count">2</div>
       </div>
       <div class="score-stone white"></div>
@@ -318,8 +376,13 @@
       <button class="mode-btn active" id="mode-pvp" onclick="setMode('pvp')">2人対戦</button>
       <button class="mode-btn" id="mode-pvc" onclick="setMode('pvc')">vsコンピュータ</button>
     </div>
+    <select id="diff-select" style="display:none" onchange="changeDiff(this.value)">
+      <option value="easy">弱い</option>
+      <option value="normal" selected>普通</option>
+      <option value="hard">強い</option>
+    </select>
     <button class="btn-hint" id="hint-btn" onclick="toggleHint()">ヒント表示</button>
-    <button class="btn-restart" onclick="restartGame()">最初から</button>
+    <button class="btn-restart" id="restart-btn" onclick="restartGame()">最初から</button>
   </div>
 
   <div class="board-wrapper">
@@ -331,7 +394,7 @@
   <div class="result-card">
     <div class="result-title" id="result-title"></div>
     <div class="result-score" id="result-score"></div>
-    <button class="result-play-again" onclick="restartGame()">もう一度</button>
+    <button class="result-play-again" id="result-play-again" onclick="restartGame()">もう一度</button>
   </div>
 </div>
 
@@ -339,7 +402,83 @@
   const EMPTY = 0, BLACK = 1, WHITE = 2;
   const DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
 
-  let board, currentPlayer, showHints, gameMode, aiThinking;
+  let board, currentPlayer, showHints, gameMode, aiThinking, difficulty;
+
+  const AI_DEPTH = { easy: 0, normal: 3, hard: 5 };
+
+  // --- i18n ---
+
+  const TRANSLATIONS = {
+    ja: {
+      title:      'リバーシ',
+      black:      '黒',
+      white:      '白',
+      blackTurn:  '黒のターン',
+      whiteTurn:  '白のターン',
+      aiThinking: 'コンピュータが考えています...',
+      pass:       '{color}はパスです',
+      pvp:        '2人対戦',
+      pvc:        'vsコンピュータ',
+      hint:       'ヒント表示',
+      diffEasy:   '弱い',
+      diffNormal: '普通',
+      diffHard:   '強い',
+      restart:    '最初から',
+      playAgain:  'もう一度',
+      blackWins:  '黒の勝ち！',
+      whiteWins:  '白の勝ち！',
+      draw:       '引き分け！',
+      score:      '黒 {black} - {white} 白',
+    },
+    zh: {
+      title:      '黑白棋',
+      black:      '黑',
+      white:      '白',
+      blackTurn:  '黑棋回合',
+      whiteTurn:  '白棋回合',
+      aiThinking: '电脑思考中...',
+      pass:       '{color}跳过回合',
+      pvp:        '双人对战',
+      pvc:        'vs电脑',
+      hint:       '显示提示',
+      diffEasy:   '简单',
+      diffNormal: '普通',
+      diffHard:   '困难',
+      restart:    '重新开始',
+      playAgain:  '再来一局',
+      blackWins:  '黑棋胜！',
+      whiteWins:  '白棋胜！',
+      draw:       '平局！',
+      score:      '黑 {black} - {white} 白',
+    },
+  };
+
+  let currentLang = 'ja';
+
+  function t(key) { return TRANSLATIONS[currentLang][key]; }
+
+  function applyTranslations() {
+    document.title = t('title');
+    document.getElementById('game-title').textContent       = t('title');
+    document.getElementById('black-label').textContent      = t('black');
+    document.getElementById('white-label').textContent      = t('white');
+    document.getElementById('mode-pvp').textContent         = t('pvp');
+    document.getElementById('mode-pvc').textContent         = t('pvc');
+    document.getElementById('hint-btn').textContent         = t('hint');
+    document.getElementById('restart-btn').textContent      = t('restart');
+    document.getElementById('result-play-again').textContent = t('playAgain');
+    document.getElementById('lang-select').value            = currentLang;
+    const ds = document.getElementById('diff-select').options;
+    ds[0].text = t('diffEasy');
+    ds[1].text = t('diffNormal');
+    ds[2].text = t('diffHard');
+  }
+
+  function changeLang(lang) {
+    currentLang = lang;
+    applyTranslations();
+    renderBoard();
+  }
 
   function initBoard() {
     board = Array.from({length: 8}, () => new Array(8).fill(EMPTY));
@@ -422,8 +561,8 @@
 
     const isAI = gameMode === 'pvc' && currentPlayer === WHITE;
     document.getElementById('turn-indicator').textContent = isAI
-      ? 'コンピュータが考えています...'
-      : (blackActive ? '黒のターン' : '白のターン');
+      ? t('aiThinking')
+      : (blackActive ? t('blackTurn') : t('whiteTurn'));
   }
 
   // --- Game logic ---
@@ -480,8 +619,9 @@
 
     if (!nextMoves.length) {
       // pass
+      const colorName = next === BLACK ? t('black') : t('white');
       document.getElementById('turn-indicator').textContent =
-        (next === BLACK ? '黒' : '白') + 'はパスです';
+        t('pass').replace('{color}', colorName);
       renderBoard();
       await delay(1200);
       // stay with currentPlayer
@@ -505,11 +645,11 @@
     const title = document.getElementById('result-title');
     const score = document.getElementById('result-score');
 
-    if (black > white)      title.textContent = '黒の勝ち！';
-    else if (white > black) title.textContent = '白の勝ち！';
-    else                    title.textContent = '引き分け！';
+    if (black > white)      title.textContent = t('blackWins');
+    else if (white > black) title.textContent = t('whiteWins');
+    else                    title.textContent = t('draw');
 
-    score.textContent = `黒 ${black} - ${white} 白`;
+    score.textContent = t('score').replace('{black}', black).replace('{white}', white);
     overlay.classList.add('show');
     renderBoard();
   }
@@ -576,11 +716,20 @@
     const moves = validMoves(board, WHITE);
     if (!moves.length) { await nextTurn(); return; }
 
-    let bestScore = -Infinity, bestMove = moves[0];
-    for (const [r, c] of moves) {
-      const nb = applyMove(board, r, c, WHITE);
-      const score = minimax(nb, 4, -Infinity, Infinity, false, WHITE);
-      if (score > bestScore) { bestScore = score; bestMove = [r, c]; }
+    let bestMove;
+    const depth = AI_DEPTH[difficulty];
+
+    if (depth === 0) {
+      // easy: random
+      bestMove = moves[Math.floor(Math.random() * moves.length)];
+    } else {
+      let bestScore = -Infinity;
+      bestMove = moves[0];
+      for (const [r, c] of moves) {
+        const nb = applyMove(board, r, c, WHITE);
+        const score = minimax(nb, depth, -Infinity, Infinity, false, WHITE);
+        if (score > bestScore) { bestScore = score; bestMove = [r, c]; }
+      }
     }
 
     const [r, c] = bestMove;
@@ -595,7 +744,12 @@
     gameMode = mode;
     document.getElementById('mode-pvp').classList.toggle('active', mode === 'pvp');
     document.getElementById('mode-pvc').classList.toggle('active', mode === 'pvc');
+    document.getElementById('diff-select').style.display = mode === 'pvc' ? '' : 'none';
     restartGame();
+  }
+
+  function changeDiff(val) {
+    difficulty = val;
   }
 
   function toggleHint() {
@@ -639,7 +793,9 @@
   // --- Init ---
   showHints = false;
   gameMode = 'pvp';
+  difficulty = 'normal';
   updateSizes();
+  applyTranslations();
   restartGame();
 
   // --- Service Worker ---
