@@ -162,19 +162,6 @@
       background: #388e3c;
     }
 
-    .cell.hint {
-      cursor: pointer;
-    }
-
-    .cell.hint::after {
-      content: '';
-      width: var(--hint, 14px);
-      height: var(--hint, 14px);
-      border-radius: 50%;
-      background: rgba(255,255,255,0.3);
-      position: absolute;
-    }
-
     .stone {
       width: var(--stone, 44px);
       height: var(--stone, 44px);
@@ -239,14 +226,6 @@
     }
 
     .btn-restart:hover { background: #c8e6c9; }
-
-    .btn-hint {
-      background: #37474f;
-      color: #e8eaf0;
-    }
-
-    .btn-hint:hover { background: #455a64; }
-    .btn-hint.active { background: #558b6e; }
 
     .mode-select {
       display: flex;
@@ -376,12 +355,11 @@
       <button class="mode-btn active" id="mode-pvp" onclick="setMode('pvp')">2人対戦</button>
       <button class="mode-btn" id="mode-pvc" onclick="setMode('pvc')">vsコンピュータ</button>
     </div>
-    <select id="diff-select" style="display:none" onchange="changeDiff(this.value)">
+    <select id="diff-select" onchange="changeDiff(this.value)">
       <option value="easy">弱い</option>
       <option value="normal" selected>普通</option>
       <option value="hard">強い</option>
     </select>
-    <button class="btn-hint" id="hint-btn" onclick="toggleHint()">ヒント表示</button>
     <button class="btn-restart" id="restart-btn" onclick="restartGame()">最初から</button>
   </div>
 
@@ -402,7 +380,7 @@
   const EMPTY = 0, BLACK = 1, WHITE = 2;
   const DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
 
-  let board, currentPlayer, showHints, gameMode, aiThinking, difficulty;
+  let board, currentPlayer, gameMode, aiThinking, difficulty;
 
   const AI_DEPTH = { easy: 0, normal: 3, hard: 5 };
 
@@ -419,7 +397,6 @@
       pass:       '{color}はパスです',
       pvp:        '2人対戦',
       pvc:        'vsコンピュータ',
-      hint:       'ヒント表示',
       diffEasy:   '弱い',
       diffNormal: '普通',
       diffHard:   '強い',
@@ -440,7 +417,6 @@
       pass:       '{color}跳过回合',
       pvp:        '双人对战',
       pvc:        'vs电脑',
-      hint:       '显示提示',
       diffEasy:   '简单',
       diffNormal: '普通',
       diffHard:   '困难',
@@ -464,7 +440,6 @@
     document.getElementById('white-label').textContent      = t('white');
     document.getElementById('mode-pvp').textContent         = t('pvp');
     document.getElementById('mode-pvc').textContent         = t('pvc');
-    document.getElementById('hint-btn').textContent         = t('hint');
     document.getElementById('restart-btn').textContent      = t('restart');
     document.getElementById('result-play-again').textContent = t('playAgain');
     document.getElementById('lang-select').value            = currentLang;
@@ -529,13 +504,12 @@
 
   function renderBoard() {
     const boardEl = document.getElementById('board');
-    const hints = showHints ? new Set(validMoves(board, currentPlayer).map(([r,c]) => `${r},${c}`)) : new Set();
 
     boardEl.innerHTML = '';
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
         const cell = document.createElement('div');
-        cell.className = 'cell' + (hints.has(`${r},${c}`) ? ' hint' : '');
+        cell.className = 'cell';
         cell.dataset.r = r; cell.dataset.c = c;
         cell.onclick = () => handleClick(r, c);
 
@@ -744,18 +718,11 @@
     gameMode = mode;
     document.getElementById('mode-pvp').classList.toggle('active', mode === 'pvp');
     document.getElementById('mode-pvc').classList.toggle('active', mode === 'pvc');
-    document.getElementById('diff-select').style.display = mode === 'pvc' ? '' : 'none';
     restartGame();
   }
 
   function changeDiff(val) {
     difficulty = val;
-  }
-
-  function toggleHint() {
-    showHints = !showHints;
-    document.getElementById('hint-btn').classList.toggle('active', showHints);
-    renderBoard();
   }
 
   function restartGame() {
@@ -779,19 +746,16 @@
     const maxCell = 56;
     const cellSize = Math.min(maxCell, Math.floor((window.innerWidth - bodyPad - boardBorder - gaps) / 8));
     const stoneSize = Math.floor(cellSize * 0.78);
-    const hintSize  = Math.floor(cellSize * 0.26);
     const boardSize = cellSize * 8 + gaps + boardBorder;
     const root = document.documentElement;
     root.style.setProperty('--cell',       cellSize  + 'px');
     root.style.setProperty('--stone',      stoneSize + 'px');
-    root.style.setProperty('--hint',       hintSize  + 'px');
     root.style.setProperty('--board-size', boardSize + 'px');
   }
 
   window.addEventListener('resize', updateSizes);
 
   // --- Init ---
-  showHints = false;
   gameMode = 'pvp';
   difficulty = 'normal';
   updateSizes();
