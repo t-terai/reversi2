@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>リバーシ</title>
+  <meta name="theme-color" content="#1a2634">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="リバーシ">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a2634;
+      color: #e8eaf0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 20px 16px;
+      padding-top: max(20px, env(safe-area-inset-top));
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
+      overflow-x: hidden;
+    }
+
+    h1 {
+      font-size: 2rem;
+      letter-spacing: 0.1em;
+      margin-bottom: 20px;
+      color: #a8d5a2;
+    }
+
+    .game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* Score bar */
+    .scoreboard {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      background: #243447;
+      border-radius: 12px;
+      padding: 12px 20px;
+      box-shadow: 0 2px 12px #0006;
+      width: var(--board-size, 480px);
+      justify-content: space-between;
+    }
+
+    .score-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .score-stone {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid #ffffff33;
+    }
+
+    .score-stone.black { background: #1a1a1a; }
+    .score-stone.white { background: #f0f0f0; }
+
+    .score-label {
+      font-size: 0.85rem;
+      color: #8899aa;
+    }
+
+    .score-value {
+      font-size: 1.6rem;
+      font-weight: bold;
+    }
+
+    .score-item.active .score-label { color: #a8d5a2; }
+    .score-item.active .score-value { color: #a8d5a2; }
+
+    .turn-indicator {
+      font-size: 0.9rem;
+      color: #8899aa;
+      text-align: center;
+    }
+
+    .turn-indicator .turn-name {
+      font-weight: bold;
+      color: #e8eaf0;
+    }
+
+    /* Board */
+    .board-wrapper {
+      position: relative;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 2px;
+      background: #1b5e20;
+      border: 4px solid #1b5e20;
+      border-radius: 4px;
+      box-shadow: 0 4px 24px #0008;
+    }
+
+    .cell {
+      width: var(--cell, 56px);
+      height: var(--cell, 56px);
+      background: #2e7d32;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.15s;
+    }
+
+    .cell:hover {
+      background: #388e3c;
+    }
+
+    .cell.hint {
+      cursor: pointer;
+    }
+
+    .cell.hint::after {
+      content: '';
+      width: var(--hint, 14px);
+      height: var(--hint, 14px);
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      position: absolute;
+    }
+
+    .stone {
+      width: var(--stone, 44px);
+      height: var(--stone, 44px);
+      border-radius: 50%;
+      position: absolute;
+      transition: transform 0.25s ease;
+      box-shadow: 0 2px 6px #0005;
+    }
+
+    .stone.black {
+      background: radial-gradient(circle at 35% 35%, #555, #111);
+      border: 1px solid #000;
+    }
+
+    .stone.white {
+      background: radial-gradient(circle at 35% 35%, #fff, #ccc);
+      border: 1px solid #bbb;
+    }
+
+    .stone.flipping {
+      animation: flip 0.3s ease forwards;
+    }
+
+    @keyframes flip {
+      0%   { transform: scaleX(1); }
+      50%  { transform: scaleX(0); }
+      100% { transform: scaleX(1); }
+    }
+
+    .stone.placing {
+      animation: place 0.2s ease forwards;
+    }
+
+    @keyframes place {
+      0%   { transform: scale(0); }
+      80%  { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button {
+      padding: 10px 22px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+
+    .btn-restart {
+      background: #a8d5a2;
+      color: #1a2634;
+    }
+
+    .btn-restart:hover { background: #c8e6c9; }
+
+    .btn-hint {
+      background: #37474f;
+      color: #e8eaf0;
+    }
+
+    .btn-hint:hover { background: #455a64; }
+    .btn-hint.active { background: #558b6e; }
+
+    .mode-select {
+      display: flex;
+      gap: 6px;
+      background: #243447;
+      border-radius: 8px;
+      padding: 4px;
+    }
+
+    .mode-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      background: transparent;
+      color: #8899aa;
+    }
+
+    .mode-btn.active {
+      background: #37474f;
+      color: #e8eaf0;
+    }
+
+    /* Overlay */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #000a;
+      z-index: 10;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .overlay.show { display: flex; }
+
+    .result-card {
+      background: #243447;
+      border-radius: 16px;
+      padding: 40px 48px;
+      text-align: center;
+      box-shadow: 0 8px 40px #000a;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .result-title {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #a8d5a2;
+    }
+
+    .result-score {
+      font-size: 1.1rem;
+      color: #8899aa;
+    }
+
+    .result-play-again {
+      background: #a8d5a2;
+      color: #1a2634;
+      padding: 12px 32px;
+      font-size: 1rem;
+      border-radius: 10px;
+      margin-top: 8px;
+    }
+
+    .result-play-again:hover { background: #c8e6c9; }
+
+    @media (max-width: 520px) {
+      h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>リバーシ</h1>
+
+<div class="game-container">
+  <div class="scoreboard">
+    <div class="score-item" id="black-score-item">
+      <div class="score-stone black"></div>
+      <div>
+        <div class="score-label">黒</div>
+        <div class="score-value" id="black-count">2</div>
+      </div>
+    </div>
+    <div class="turn-indicator" id="turn-indicator">黒のターン</div>
+    <div class="score-item" id="white-score-item">
+      <div>
+        <div class="score-label" style="text-align:right">白</div>
+        <div class="score-value" id="white-count">2</div>
+      </div>
+      <div class="score-stone white"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="mode-select">
+      <button class="mode-btn active" id="mode-pvp" onclick="setMode('pvp')">2人対戦</button>
+      <button class="mode-btn" id="mode-pvc" onclick="setMode('pvc')">vsコンピュータ</button>
+    </div>
+    <button class="btn-hint" id="hint-btn" onclick="toggleHint()">ヒント表示</button>
+    <button class="btn-restart" onclick="restartGame()">最初から</button>
+  </div>
+
+  <div class="board-wrapper">
+    <div class="board" id="board"></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="result-card">
+    <div class="result-title" id="result-title"></div>
+    <div class="result-score" id="result-score"></div>
+    <button class="result-play-again" onclick="restartGame()">もう一度</button>
+  </div>
+</div>
+
+<script>
+  const EMPTY = 0, BLACK = 1, WHITE = 2;
+  const DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+
+  let board, currentPlayer, showHints, gameMode, aiThinking;
+
+  function initBoard() {
+    board = Array.from({length: 8}, () => new Array(8).fill(EMPTY));
+    board[3][3] = WHITE; board[3][4] = BLACK;
+    board[4][3] = BLACK; board[4][4] = WHITE;
+  }
+
+  function getFlips(b, r, c, player) {
+    const opp = player === BLACK ? WHITE : BLACK;
+    const flips = [];
+    for (const [dr, dc] of DIRS) {
+      const line = [];
+      let nr = r + dr, nc = c + dc;
+      while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && b[nr][nc] === opp) {
+        line.push([nr, nc]);
+        nr += dr; nc += dc;
+      }
+      if (line.length && nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && b[nr][nc] === player) {
+        flips.push(...line);
+      }
+    }
+    return flips;
+  }
+
+  function validMoves(b, player) {
+    const moves = [];
+    for (let r = 0; r < 8; r++)
+      for (let c = 0; c < 8; c++)
+        if (b[r][c] === EMPTY && getFlips(b, r, c, player).length)
+          moves.push([r, c]);
+    return moves;
+  }
+
+  function applyMove(b, r, c, player) {
+    const nb = b.map(row => [...row]);
+    nb[r][c] = player;
+    for (const [fr, fc] of getFlips(nb, r, c, player)) nb[fr][fc] = player;
+    return nb;
+  }
+
+  function countStones(b) {
+    let black = 0, white = 0;
+    for (const row of b) for (const v of row) { if (v === BLACK) black++; else if (v === WHITE) white++; }
+    return { black, white };
+  }
+
+  // --- Rendering ---
+
+  function renderBoard() {
+    const boardEl = document.getElementById('board');
+    const hints = showHints ? new Set(validMoves(board, currentPlayer).map(([r,c]) => `${r},${c}`)) : new Set();
+
+    boardEl.innerHTML = '';
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell' + (hints.has(`${r},${c}`) ? ' hint' : '');
+        cell.dataset.r = r; cell.dataset.c = c;
+        cell.onclick = () => handleClick(r, c);
+
+        if (board[r][c] !== EMPTY) {
+          const stone = document.createElement('div');
+          stone.className = 'stone ' + (board[r][c] === BLACK ? 'black' : 'white');
+          cell.appendChild(stone);
+        }
+        boardEl.appendChild(cell);
+      }
+    }
+    updateScoreboard();
+  }
+
+  function updateScoreboard() {
+    const { black, white } = countStones(board);
+    document.getElementById('black-count').textContent = black;
+    document.getElementById('white-count').textContent = white;
+
+    const blackActive = currentPlayer === BLACK;
+    document.getElementById('black-score-item').classList.toggle('active', blackActive);
+    document.getElementById('white-score-item').classList.toggle('active', !blackActive);
+
+    const isAI = gameMode === 'pvc' && currentPlayer === WHITE;
+    document.getElementById('turn-indicator').textContent = isAI
+      ? 'コンピュータが考えています...'
+      : (blackActive ? '黒のターン' : '白のターン');
+  }
+
+  // --- Game logic ---
+
+  async function handleClick(r, c) {
+    if (aiThinking) return;
+    if (gameMode === 'pvc' && currentPlayer === WHITE) return;
+    if (board[r][c] !== EMPTY) return;
+    const flips = getFlips(board, r, c, currentPlayer);
+    if (!flips.length) return;
+    await placeStone(r, c, flips);
+    await nextTurn();
+  }
+
+  async function placeStone(r, c, flips) {
+    board[r][c] = currentPlayer;
+    // animate placing
+    const cell = getCellEl(r, c);
+    const stone = document.createElement('div');
+    stone.className = 'stone placing ' + (currentPlayer === BLACK ? 'black' : 'white');
+    cell.classList.remove('hint');
+    cell.appendChild(stone);
+
+    await delay(200);
+
+    // animate flips
+    for (const [fr, fc] of flips) {
+      board[fr][fc] = currentPlayer;
+      const fc_el = getCellEl(fr, fc);
+      const s = fc_el.querySelector('.stone');
+      if (s) {
+        s.classList.add('flipping');
+        s.addEventListener('animationend', () => {
+          s.className = 'stone ' + (currentPlayer === BLACK ? 'black' : 'white');
+        }, { once: true });
+      }
+    }
+    await delay(350);
+  }
+
+  function getCellEl(r, c) {
+    return document.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+  }
+
+  async function nextTurn() {
+    const next = currentPlayer === BLACK ? WHITE : BLACK;
+    const nextMoves = validMoves(board, next);
+    const curMoves  = validMoves(board, currentPlayer);
+
+    if (!nextMoves.length && !curMoves.length) {
+      endGame();
+      return;
+    }
+
+    if (!nextMoves.length) {
+      // pass
+      document.getElementById('turn-indicator').textContent =
+        (next === BLACK ? '黒' : '白') + 'はパスです';
+      renderBoard();
+      await delay(1200);
+      // stay with currentPlayer
+    } else {
+      currentPlayer = next;
+    }
+
+    renderBoard();
+
+    if (gameMode === 'pvc' && currentPlayer === WHITE) {
+      aiThinking = true;
+      await delay(600);
+      await doAIMove();
+      aiThinking = false;
+    }
+  }
+
+  function endGame() {
+    const { black, white } = countStones(board);
+    const overlay = document.getElementById('overlay');
+    const title = document.getElementById('result-title');
+    const score = document.getElementById('result-score');
+
+    if (black > white)      title.textContent = '黒の勝ち！';
+    else if (white > black) title.textContent = '白の勝ち！';
+    else                    title.textContent = '引き分け！';
+
+    score.textContent = `黒 ${black} - ${white} 白`;
+    overlay.classList.add('show');
+    renderBoard();
+  }
+
+  // --- AI (minimax with alpha-beta) ---
+
+  const WEIGHTS = [
+    [120,-20, 20,  5,  5, 20,-20,120],
+    [-20,-40, -5, -5, -5, -5,-40,-20],
+    [ 20, -5, 15,  3,  3, 15, -5, 20],
+    [  5, -5,  3,  3,  3,  3, -5,  5],
+    [  5, -5,  3,  3,  3,  3, -5,  5],
+    [ 20, -5, 15,  3,  3, 15, -5, 20],
+    [-20,-40, -5, -5, -5, -5,-40,-20],
+    [120,-20, 20,  5,  5, 20,-20,120],
+  ];
+
+  function evaluate(b, player) {
+    const opp = player === BLACK ? WHITE : BLACK;
+    let score = 0;
+    for (let r = 0; r < 8; r++)
+      for (let c = 0; c < 8; c++) {
+        if (b[r][c] === player) score += WEIGHTS[r][c];
+        else if (b[r][c] === opp) score -= WEIGHTS[r][c];
+      }
+    score += (validMoves(b, player).length - validMoves(b, opp).length) * 10;
+    return score;
+  }
+
+  function minimax(b, depth, alpha, beta, maximizing, aiPlayer) {
+    const player = maximizing ? aiPlayer : (aiPlayer === BLACK ? WHITE : BLACK);
+    const moves = validMoves(b, player);
+
+    if (depth === 0 || (!moves.length && !validMoves(b, aiPlayer === BLACK ? WHITE : BLACK).length)) {
+      return evaluate(b, aiPlayer);
+    }
+
+    if (!moves.length) {
+      return minimax(b, depth - 1, alpha, beta, !maximizing, aiPlayer);
+    }
+
+    if (maximizing) {
+      let best = -Infinity;
+      for (const [r, c] of moves) {
+        const nb = applyMove(b, r, c, player);
+        best = Math.max(best, minimax(nb, depth - 1, alpha, beta, false, aiPlayer));
+        alpha = Math.max(alpha, best);
+        if (beta <= alpha) break;
+      }
+      return best;
+    } else {
+      let best = Infinity;
+      for (const [r, c] of moves) {
+        const nb = applyMove(b, r, c, player);
+        best = Math.min(best, minimax(nb, depth - 1, alpha, beta, true, aiPlayer));
+        beta = Math.min(beta, best);
+        if (beta <= alpha) break;
+      }
+      return best;
+    }
+  }
+
+  async function doAIMove() {
+    const moves = validMoves(board, WHITE);
+    if (!moves.length) { await nextTurn(); return; }
+
+    let bestScore = -Infinity, bestMove = moves[0];
+    for (const [r, c] of moves) {
+      const nb = applyMove(board, r, c, WHITE);
+      const score = minimax(nb, 4, -Infinity, Infinity, false, WHITE);
+      if (score > bestScore) { bestScore = score; bestMove = [r, c]; }
+    }
+
+    const [r, c] = bestMove;
+    const flips = getFlips(board, r, c, WHITE);
+    await placeStone(r, c, flips);
+    await nextTurn();
+  }
+
+  // --- Controls ---
+
+  function setMode(mode) {
+    gameMode = mode;
+    document.getElementById('mode-pvp').classList.toggle('active', mode === 'pvp');
+    document.getElementById('mode-pvc').classList.toggle('active', mode === 'pvc');
+    restartGame();
+  }
+
+  function toggleHint() {
+    showHints = !showHints;
+    document.getElementById('hint-btn').classList.toggle('active', showHints);
+    renderBoard();
+  }
+
+  function restartGame() {
+    document.getElementById('overlay').classList.remove('show');
+    initBoard();
+    currentPlayer = BLACK;
+    aiThinking = false;
+    renderBoard();
+  }
+
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // --- Responsive sizing ---
+
+  function updateSizes() {
+    const bodyPad = 32;   // 16px × 2
+    const boardBorder = 8; // 4px × 2
+    const gaps = 14;       // 7 gaps × 2px
+    const maxCell = 56;
+    const cellSize = Math.min(maxCell, Math.floor((window.innerWidth - bodyPad - boardBorder - gaps) / 8));
+    const stoneSize = Math.floor(cellSize * 0.78);
+    const hintSize  = Math.floor(cellSize * 0.26);
+    const boardSize = cellSize * 8 + gaps + boardBorder;
+    const root = document.documentElement;
+    root.style.setProperty('--cell',       cellSize  + 'px');
+    root.style.setProperty('--stone',      stoneSize + 'px');
+    root.style.setProperty('--hint',       hintSize  + 'px');
+    root.style.setProperty('--board-size', boardSize + 'px');
+  }
+
+  window.addEventListener('resize', updateSizes);
+
+  // --- Init ---
+  showHints = false;
+  gameMode = 'pvp';
+  updateSizes();
+  restartGame();
+
+  // --- Service Worker ---
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
