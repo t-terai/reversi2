@@ -233,6 +233,8 @@
       background: #243447;
       border-radius: 8px;
       padding: 4px;
+      flex-wrap: wrap;
+      justify-content: center;
     }
 
     .mode-btn {
@@ -245,6 +247,33 @@
 
     .mode-btn.active {
       background: #37474f;
+      color: #e8eaf0;
+    }
+
+    #mode-pvc-select {
+      padding: 6px 24px 6px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      background-color: transparent;
+      color: #8899aa;
+      border: none;
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238899aa'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+    }
+
+    #mode-pvc-select.active {
+      background-color: #37474f;
+      color: #e8eaf0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23e8eaf0'/%3E%3C/svg%3E");
+    }
+
+    #mode-pvc-select option {
+      background: #243447;
       color: #e8eaf0;
     }
 
@@ -294,28 +323,6 @@
 
     .result-play-again:hover { background: #c8e6c9; }
 
-    #diff-select {
-      background: #243447;
-      color: #8899aa;
-      border: 1px solid #37474f;
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 0.85rem;
-      cursor: pointer;
-      outline: none;
-      appearance: none;
-      -webkit-appearance: none;
-      padding-right: 22px;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238899aa'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 7px center;
-    }
-
-    #diff-select:hover, #diff-select:focus {
-      border-color: #558b6e;
-      color: #e8eaf0;
-    }
-
     @media (max-width: 520px) {
       h1 { font-size: 1.5rem; }
     }
@@ -353,13 +360,12 @@
   <div class="controls">
     <div class="mode-select">
       <button class="mode-btn active" id="mode-pvp" onclick="setMode('pvp')">2人対戦</button>
-      <button class="mode-btn" id="mode-pvc" onclick="setMode('pvc')">vsコンピュータ</button>
+      <select id="mode-pvc-select" onchange="setMode('pvc', this.value)">
+        <option value="easy" id="opt-easy">コンピューター（弱い）</option>
+        <option value="normal" id="opt-normal" selected>コンピューター（普通）</option>
+        <option value="hard" id="opt-hard">コンピューター（強い）</option>
+      </select>
     </div>
-    <select id="diff-select" onchange="changeDiff(this.value)">
-      <option value="easy">弱い</option>
-      <option value="normal" selected>普通</option>
-      <option value="hard">強い</option>
-    </select>
     <button class="btn-restart" id="restart-btn" onclick="restartGame()">最初から</button>
   </div>
 
@@ -396,10 +402,9 @@
       aiThinking: 'コンピュータが考えています...',
       pass:       '{color}はパスです',
       pvp:        '2人対戦',
-      pvc:        'vsコンピュータ',
-      diffEasy:   '弱い',
-      diffNormal: '普通',
-      diffHard:   '強い',
+      pvcEasy:    'コンピューター（弱い）',
+      pvcNormal:  'コンピューター（普通）',
+      pvcHard:    'コンピューター（強い）',
       restart:    '最初から',
       playAgain:  'もう一度',
       blackWins:  '黒の勝ち！',
@@ -416,10 +421,9 @@
       aiThinking: '电脑思考中...',
       pass:       '{color}跳过回合',
       pvp:        '双人对战',
-      pvc:        'vs电脑',
-      diffEasy:   '简单',
-      diffNormal: '普通',
-      diffHard:   '困难',
+      pvcEasy:    '电脑（简单）',
+      pvcNormal:  '电脑（普通）',
+      pvcHard:    '电脑（困难）',
       restart:    '重新开始',
       playAgain:  '再来一局',
       blackWins:  '黑棋胜！',
@@ -439,14 +443,12 @@
     document.getElementById('black-label').textContent      = t('black');
     document.getElementById('white-label').textContent      = t('white');
     document.getElementById('mode-pvp').textContent         = t('pvp');
-    document.getElementById('mode-pvc').textContent         = t('pvc');
+    document.getElementById('opt-easy').textContent         = t('pvcEasy');
+    document.getElementById('opt-normal').textContent       = t('pvcNormal');
+    document.getElementById('opt-hard').textContent         = t('pvcHard');
     document.getElementById('restart-btn').textContent      = t('restart');
     document.getElementById('result-play-again').textContent = t('playAgain');
     document.getElementById('lang-select').value            = currentLang;
-    const ds = document.getElementById('diff-select').options;
-    ds[0].text = t('diffEasy');
-    ds[1].text = t('diffNormal');
-    ds[2].text = t('diffHard');
   }
 
   function changeLang(lang) {
@@ -714,15 +716,15 @@
 
   // --- Controls ---
 
-  function setMode(mode) {
+  function setMode(mode, diff) {
     gameMode = mode;
-    document.getElementById('mode-pvp').classList.toggle('active', mode === 'pvp');
-    document.getElementById('mode-pvc').classList.toggle('active', mode === 'pvc');
+    if (diff !== undefined) difficulty = diff;
+    const isPvc = mode === 'pvc';
+    document.getElementById('mode-pvp').classList.toggle('active', !isPvc);
+    const sel = document.getElementById('mode-pvc-select');
+    sel.classList.toggle('active', isPvc);
+    if (diff !== undefined) sel.value = diff;
     restartGame();
-  }
-
-  function changeDiff(val) {
-    difficulty = val;
   }
 
   function restartGame() {
